@@ -20,6 +20,9 @@ CPDF  https://community.coherentpdf.com/
 hspext  https://hsp.tv/
 
 
+
 このソフトウェアは、AGPL(GNU AFFERO GENERAL PUBLIC LICENSE)3.0に基づいて製作されたものです
+
 このソフトウェアを改変するなどして使用する場合、ソースコードの開示が必要となります
+
 AGPLについて、詳しくはLISENSE.txtをご覧ください(英語です)
