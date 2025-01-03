@@ -28,6 +28,9 @@
 	sdim inidata,4096
 	sdim ini1,32
 	sdim ini2,1024
+	dim a4pages
+	dim a3pages
+	dim otherpages
 
 	sdim cdir,1024
 	cdir = dir_cur
@@ -428,7 +431,12 @@
 
 	ichi = 0
 	pagecount = 0
-	out2 = "スケーリング処理が完了しました\nファイル：" + fn + "\n\nページ   ページサイズ\t  用紙\n 番号    横(X)\t 縦(Y)\t  規格\t 判定\n--------------------------------------"
+
+	out2 = ""
+
+	a4pages = 0
+	a3pages = 0
+	otherpages = 0
 
 	repeat
 		getstr buf,out,ichi,':'
@@ -487,8 +495,7 @@
 				ypagesize(pagecount) = psbuf1
 			}
 
-			judge = "NG"
-			youshi = "－－"
+
 
 			a4w_lower = 210.0 - threshould
 			a4w_upper = 210.0 + threshould
@@ -503,11 +510,17 @@
 			if ((xpagesize(pagecount) > a4w_lower) && (xpagesize(pagecount) < a4w_upper) && (ypagesize(pagecount) > a4h_lower) && (ypagesize(pagecount) < a4h_upper)){
 				youshi = "A4縦"
 				judge = "OK"
-			}
-
-			if ((xpagesize(pagecount) > a3w_lower) && (xpagesize(pagecount) < a3w_upper) && (ypagesize(pagecount) > a3h_lower) && (ypagesize(pagecount) < a3h_upper)){
-				youshi = "A3横"
-				judge = "OK"
+				a4pages++
+			}else{
+				if ((xpagesize(pagecount) > a3w_lower) && (xpagesize(pagecount) < a3w_upper) && (ypagesize(pagecount) > a3h_lower) && (ypagesize(pagecount) < a3h_upper)){
+					youshi = "A3横"
+					judge = "OK"
+					a3pages++
+				}else{
+					judge = "NG"
+					youshi = "－－"
+					otherpages++
+				}
 			}
 
 			out2 += "\n" + strf("%4d",pagecount + 1) + "\t" + strf("%6.1f",xpagesize(pagecount)) + "\t" + strf("%6.1f",ypagesize(pagecount)) + "\t  " + youshi + "\t  " + judge
@@ -524,9 +537,12 @@
 		out2 = "PDFを解析できませんでした"
 		objenable 2,1
 	}else{
+		out2 = "スケーリング処理が完了しました\nファイル：" + fn + "\n\nA4縦："+ a4pages +"\nA3横：" + a3pages + "\nその他：" + otherpages + "\n\nページ   ページサイズ\t  用紙\n 番号    横(X)\t 縦(Y)\t  規格\t 判定\n--------------------------------------" + out2
+
 		objenable 2,1
 	}
-	
+
+
 	objprm 0,out2
 
 	stop
