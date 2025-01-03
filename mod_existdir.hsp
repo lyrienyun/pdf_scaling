@@ -1,0 +1,19 @@
+;	for HSP3.0
+
+#module "existfolder"
+
+;	exist_folder	[ディレクトリが存在するかチェック]
+;	exist_folder "dirname"
+;	"dirname"	調べるディレクトリのパス
+;	ディレクトリが存在するかどうかチェックします。
+;	存在しないディレクトリにいきなりchdirで移動するとエラーになるので…
+;	ドライブルート(C:やD:など)をチェックするときは、C:\*(C:\\*)のように
+;	ドライブ名に続けて*を入力してください。
+;	フロッピーディスクのドライブルートはチェックできません。
+;	(システムフォルダがないので…)
+#defcfunc exist_dir str sfolder
+	sdim a,1024
+	dirlist a,sfolder,5
+	if a!"":return 0:else:return -1
+
+#global

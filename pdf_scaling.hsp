@@ -1,0 +1,598 @@
+// PDF自動スケーリングツール
+//
+
+#include "hspext.as"
+#include "mod_existdir.hsp"
+
+#define SOFT_VER "0.10.2025.0103"
+
+	screen 0,500,500
+
+	sdim pipeout,2097152
+	sdim out,2097152
+	sdim out2,65536
+	ddim xpagesize,10000
+	ddim ypagesize,10000
+	dim rotateflag,10000
+	dim rot_def,10000
+	dim pagecount
+	dim ln
+	sdim buf,4096
+	sdim mediabox,128
+	sdim cropbox,128
+	sdim x0s,20
+	sdim y0s,20
+	sdim x1s,20
+	sdim y1s,20
+	sdim rot_defs,20
+	sdim inidata,4096
+	sdim ini1,32
+	sdim ini2,1024
+
+	sdim cdir,1024
+	cdir = dir_cur
+
+	sdim cpdfdir,1024
+	sdim tempdir,1024
+	sdim flist,32768
+	sdim delfn,1024
+	sdim in_cpdfpath,1024
+	sdim in_temppath,1024
+	sdim in2_temppath,1024
+
+	pos 5,5
+	font msgothic,14,17
+	mes "PDFスケーリング自動化ツール"
+	pos 385,5
+	font msgothic,10,16
+	mes "Version " + SOFT_VER
+
+	pos 0,20
+	font msgothic,14,16
+	objmode 2
+	mesbox out2,500,430,0,65536
+	pos 400,450
+	objsize 100,50
+	objmode 1
+	button goto "スケーリング実行",*scaling_start
+	pos   0,450
+	button goto "ファイル選択",*file_select
+
+	pos 200,450
+	button goto "設定",*settings
+
+	objenable 1,0
+	objenable 2,0
+
+	title "PDFスケーリング自動化ツール"
+
+	//設定項目のデフォルト値を適用しておく
+	cpdfpath = cdir + "\\cpdf.exe"
+	tempdir = cdir + "\\temp"
+	threshould = 0.5
+
+	exist "pdf_scaling.ini"
+
+	if strsize > 0{
+		bload "pdf_scaling.ini",inidata,strsize
+		ichi = 0
+		repeat 100
+			getstr ini1,inidata,ichi,'\t'
+			ichi += strsize
+			if strsize < 1 : break 
+			getstr ini2,inidata,ichi
+			ichi += strsize
+
+			if ini1 == "cpdfpath" : cpdfpath = ini2
+			if ini1 == "tempdir" : tempdir = ini2
+			if ini1 == "threshould" : threshould = double(ini2)
+			
+		loop
+	}else{
+		inidata = "cpdfpath\t" + cpdfpath + "\ntempdir\t" + tempdir + "\nthreshould\t0.5"
+		bsave "pdf_scaling.ini",inidata,strlen(inidata)
+	}
+
+	if dir_cmdline == ""{
+		dialog "pdf",16,"PDFファイル"
+		if stat != 1{
+			objenable 2,1
+			stop
+		}
+		fn = refstr
+	}else{
+		fn = dir_cmdline
+		if peek(fn,0) == '"' : getstr fn,fn,1,'"'
+	}
+
+
+*analyze_start
+
+	objenable 1,0
+	objenable 2,0
+
+	repeat 10000
+		xpagesize(cnt) = 0.0
+		ypagesize(cnt) = 0.0
+		rotateflag(cnt) = 0
+		rot_def(cnt) = 0
+	loop
+
+	pipeout = ""
+	pipeexec pipeout,"" + cpdfpath + " -page-info \"" + fn + "\"",0
+
+	objprm 0,"PDFのページ情報を取得しています..."
+
+	repeat
+		pipeget ln
+		if stat == 0 : break
+		await 0
+	loop
+
+	ichi = 0
+	out = ""
+
+	repeat
+		getstr buf,pipeout,ichi,10
+		ichi += strsize
+		out += buf + "\n"
+		if strsize <= 0 : break
+		await 0
+	loop
+
+	ichi = 0
+	pagecount = 0
+	out2 = "ファイル：" + fn + "\n\nページ   ページサイズ\t  予定   回転\n 番号    横(X)\t 縦(Y)\t用紙規格 実施\n--------------------------------------"
+
+	repeat
+		getstr buf,out,ichi,':'
+		if strsize <= 0 : break
+		movesiz = strsize
+		if buf == "MediaBox"{
+			getstr mediabox,out,ichi + 10
+			ichi2 = 0
+			getstr x0s,mediabox,ichi2,' '
+			ichi2 = strsize
+			getstr y0s,mediabox,ichi2,' '
+			ichi2 += strsize
+			getstr x1s,mediabox,ichi2,' '
+			ichi2 += strsize
+			getstr y1s,mediabox,ichi2,' '
+			x0 = double(x0s)
+			y0 = double(y0s)
+			x1 = double(x1s)
+			y1 = double(y1s)
+
+			xpagesize(pagecount) = double(absf((x1 - x0) * 0.3527777777777778))
+			ypagesize(pagecount) = double(absf((y1 - y0) * 0.3527777777777778))
+		}
+
+		if buf == "CropBox"{
+
+			getstr cropbox,out,ichi + 9
+
+			if strsize > 5{
+				ichi2 = 0
+				getstr x0s,cropbox,0,' '
+				ichi2 = strsize
+				getstr y0s,cropbox,ichi2,' '
+				ichi2 += strsize
+				getstr x1s,cropbox,ichi2,' '
+				ichi2 += strsize
+				getstr y1s,cropbox,ichi2,' '
+				x0 = double(x0s)
+				y0 = double(y0s)
+				x1 = double(x1s)
+				y1 = double(y1s)
+
+				xpagesize(pagecount) = double(absf((x1 - x0) * 0.3527777777777778))
+				ypagesize(pagecount) = double(absf((y1 - y0) * 0.3527777777777778))
+			}
+		}
+
+		if buf == "Rotation"{
+
+			getstr rot_defs,out,ichi + 10
+			rot_def(cnt) = int(rot_defs)
+			if ((rot_def(cnt) == 90) || (rot_def(cnt) == 270)){
+				psbuf1 = xpagesize(pagecount)
+				psbuf2 = ypagesize(pagecount)
+				xpagesize(pagecount) = psbuf2
+				ypagesize(pagecount) = psbuf1
+			}
+
+			if xpagesize(pagecount) > ypagesize(pagecount){
+				longsize = xpagesize(pagecount)
+			}else{
+				longsize = ypagesize(pagecount)
+			}
+
+			if longsize > 300.0 {
+				scalesize(pagecount) = 3
+				yoteisize = "A3横"
+
+				if xpagesize(pagecount) > ypagesize(pagecount){
+					rotateflag(pagecount) = 0
+					rotate = "－"
+				}else{
+					rotateflag(pagecount) = 1
+					rotate = "〇"
+				}
+			}else{
+				scalesize(pagecount) = 4
+				yoteisize = "A4縦"
+				if xpagesize(pagecount) > ypagesize(pagecount){
+					rotateflag(pagecount) = 1
+					rotate = "〇"
+				}else{
+					rotateflag(pagecount) = 0
+					rotate = "－"
+				}
+			}
+
+			out2 += "\n" + strf("%4d",pagecount + 1) + "\t" + strf("%6.1f",xpagesize(pagecount)) + "\t" + strf("%6.1f",ypagesize(pagecount)) + "\t  " + yoteisize + "\t  " + rotate
+
+			pagecount++
+
+		}
+
+		ichi += movesiz
+		await 0
+	loop
+
+	if pagecount <= 0{
+		out2 = "PDFを解析できませんでした"
+		objenable 2,1
+	}else{
+		objenable 1,1
+		objenable 2,1
+	}
+	
+	objprm 0,out2
+
+	stop
+
+//スケーリング開始
+*scaling_start
+
+	objenable 1,0
+	objenable 2,0
+
+	if exist_dir(tempdir) == -1{
+		out2 = "作業用フォルダが存在しません\n\n" + out2
+		objprm 0,out2
+		objenable 1,1
+		objenable 2,1
+		stop
+	}
+
+	out2 = "スケーリング処理を開始します...\n\n" + out2
+	objprm 0,out2
+
+	chdir tempdir
+	dirlist flist,"*.*",1
+	repeat stat
+		dirlist flist,"*.*",1
+		if strlen(flist) < 1 : break
+		getstr delfn,flist,0
+		delete "" + tempdir + "\\" + delfn
+	loop
+
+	pipeout = ""
+	pipeexec pipeout,"" + cpdfpath + " -split \"" + fn + "\" -o \"" + tempdir + "\\temp%%%%.pdf\"",0
+
+	repeat
+		pipeget ln
+		if stat == 0 : break
+		await 0
+	loop
+
+	if strlen(pipeout) > 5{
+		out2 = "ファイル分割が正常に完了しませんでした\n"+ pipeout + "\n\n" + out2
+		objprm 0,out2
+		objenable 1,1
+		objenable 2,1
+		stop
+	}
+
+	out2 = "ファイル分割が完了しました...\n\n" + out2
+	objprm 0,out2
+
+	repeat pagecount
+
+		pageno = cnt + 1
+
+		if rotateflag(cnt) == 1{
+
+			pipeout = ""
+			if scalesize(cnt) == 3 {
+				rot = rot_def(cnt) + 90
+				if rot == 360 : rot = 0
+				pipeexec pipeout,"" + cpdfpath + " -rotate " + rot + " \"" + tempdir + "\\temp" + strf("%04d",pageno) + ".pdf\" -o \"" + tempdir + "\\rote" + strf("%04d",pageno) + ".pdf\"",0
+				}else{
+				rot = rot_def(cnt) - 90
+				if rot == -90 : rot = 270
+				pipeexec pipeout,"" + cpdfpath + " -rotate " + rot + " \"" + tempdir + "\\temp" + strf("%04d",pageno) + ".pdf\" -o \"" + tempdir + "\\rote" + strf("%04d",pageno) + ".pdf\"",0
+			}
+
+			repeat
+				pipeget ln
+				if stat == 0 : break
+				await 0
+			loop
+
+			if strlen(pipeout) > 5{
+				out2 = "ページの回転処理が正常に完了しませんでした\n"+ pipeout + "\n\n" + out2
+				objprm 0,out2
+				stop
+			}
+
+		}else{
+
+			bcopy "" + tempdir + "\\temp" + strf("%04d",pageno) + ".pdf","" + tempdir + "\\rote" + strf("%04d",pageno) + ".pdf"
+
+		}
+
+		delete "" + tempdir + "\\temp" + strf("%04d",pageno) + ".pdf"
+
+		pipeout = ""
+
+		if scalesize(cnt) == 3 {
+			pipeexec pipeout,"" + cpdfpath + " -prerotate -scale-to-fit \"420mm 297mm\" -no-warn-rotate \"" + tempdir + "\\rote" + strf("%04d",pageno) + ".pdf\" -o \"" + tempdir + "\\temp" + strf("%04d",pageno) + ".pdf\"",0
+		}else{
+			pipeexec pipeout,"" + cpdfpath + " -prerotate -scale-to-fit \"210mm 297mm\" -no-warn-rotate \"" + tempdir + "\\rote" + strf("%04d",pageno) + ".pdf\" -o \"" + tempdir + "\\temp" + strf("%04d",pageno) + ".pdf\"",0
+		}
+
+		repeat
+			pipeget ln
+			if stat == 0 : break
+			await 0
+		loop
+
+		if strlen(pipeout) > 5{
+			out2 = "ページのスケーリング処理が正常に完了しませんでした\n" + pipeout + "\n\n" + out2
+			objprm 0,out2
+			stop
+		}
+
+		delete "" + tempdir + "\\rote" + strf("%04d",pageno) + ".pdf"
+
+		out2 = "" + pageno + "ページのスケーリングが完了しました...\n" + out2
+		objprm 0,out2
+
+	loop
+
+	pipeout = ""
+	pipeexec pipeout,"" + cpdfpath + " -merge -idir \"" + tempdir + "\" -o \"" + getpath(fn,1) + "_out.pdf\""
+
+	repeat
+		pipeget ln
+		if stat == 0 : break
+		await 0
+	loop
+
+	if strlen(pipeout) > 5{
+		out2 = "ファイル結合が正常に完了しませんでした\n" + out2
+		objprm 0,out2
+		objenable 1,1
+		objenable 2,1
+		stop
+	}
+
+	chdir tempdir
+	dirlist flist,"*.*",1
+	repeat stat
+		dirlist flist,"*.*",1
+		if strlen(flist) < 1 : break
+		getstr delfn,flist,0
+		delete "" + tempdir + "\\" + delfn
+	loop
+
+	out2 = "ファイル結合が完了しました\n" + out2
+	objprm 0,out2
+
+	delete fn
+	bcopy "" + getpath(fn,1) + "_out.pdf",fn
+	delete "" + getpath(fn,1) + "_out.pdf"
+
+//再度解析
+
+	repeat 10000
+		xpagesize(cnt) = 0.0
+		ypagesize(cnt) = 0.0
+		rotateflag(cnt) = 0
+		rot_def(cnt) = 0
+	loop
+
+	pipeout = ""
+	pipeexec pipeout,"" + cpdfpath + " -page-info \"" + fn + "\"",0
+
+	objprm 0,"PDFのページ情報を取得しています..."
+
+	repeat
+		pipeget ln
+		if stat == 0 : break
+		await 0
+	loop
+
+	ichi = 0
+	out = ""
+
+	repeat
+		getstr buf,pipeout,ichi,10
+		ichi += strsize
+		out += buf + "\n"
+		if strsize <= 0 : break
+		await 0
+	loop
+
+	ichi = 0
+	pagecount = 0
+	out2 = "スケーリング処理が完了しました\nファイル：" + fn + "\n\nページ   ページサイズ\t  用紙   NEXCO\n 番号    横(X)\t 縦(Y)\t  規格\t 判定\n--------------------------------------"
+
+	repeat
+		getstr buf,out,ichi,':'
+		if strsize <= 0 : break
+		movesiz = strsize
+		if buf == "MediaBox"{
+			getstr mediabox,out,ichi + 10
+			ichi2 = 0
+			getstr x0s,mediabox,ichi2,' '
+			ichi2 = strsize
+			getstr y0s,mediabox,ichi2,' '
+			ichi2 += strsize
+			getstr x1s,mediabox,ichi2,' '
+			ichi2 += strsize
+			getstr y1s,mediabox,ichi2,' '
+			x0 = double(x0s)
+			y0 = double(y0s)
+			x1 = double(x1s)
+			y1 = double(y1s)
+
+			xpagesize(pagecount) = double(absf((x1 - x0) * 0.3527777777777778))
+			ypagesize(pagecount) = double(absf((y1 - y0) * 0.3527777777777778))
+		}
+
+		if buf == "CropBox"{
+
+			getstr cropbox,out,ichi + 9
+
+			if strsize > 5{
+				ichi2 = 0
+				getstr x0s,cropbox,0,' '
+				ichi2 = strsize
+				getstr y0s,cropbox,ichi2,' '
+				ichi2 += strsize
+				getstr x1s,cropbox,ichi2,' '
+				ichi2 += strsize
+				getstr y1s,cropbox,ichi2,' '
+				x0 = double(x0s)
+				y0 = double(y0s)
+				x1 = double(x1s)
+				y1 = double(y1s)
+
+				xpagesize(pagecount) = double(absf((x1 - x0) * 0.3527777777777778))
+				ypagesize(pagecount) = double(absf((y1 - y0) * 0.3527777777777778))
+			}
+		}
+
+		if buf == "Rotation"{
+
+			getstr rot_defs,out,ichi + 10
+			rot_def(cnt) = int(rot_defs)
+			if ((rot_def(cnt) == 90) || (rot_def(cnt) == 270)){
+				psbuf1 = xpagesize(pagecount)
+				psbuf2 = ypagesize(pagecount)
+				xpagesize(pagecount) = psbuf2
+				ypagesize(pagecount) = psbuf1
+			}
+
+			judge = "NG"
+			youshi = "－－"
+
+			a4w_lower = 210.0 - threshould
+			a4w_upper = 210.0 + threshould
+			a4h_lower = 297.0 - threshould
+			a4h_upper = 297.0 + threshould
+
+			a3w_lower = 420.0 - threshould
+			a3w_upper = 420.0 + threshould
+			a3h_lower = 297.0 - threshould
+			a3h_upper = 297.0 + threshould
+
+			if ((xpagesize(pagecount) > a4w_lower) && (xpagesize(pagecount) < a4w_upper) && (ypagesize(pagecount) > a4h_lower) && (ypagesize(pagecount) < a4h_upper)){
+				youshi = "A4縦"
+				judge = "OK"
+			}
+
+			if ((xpagesize(pagecount) > a3w_lower) && (xpagesize(pagecount) < a3w_upper) && (ypagesize(pagecount) > a3h_lower) && (ypagesize(pagecount) < a3h_upper)){
+				youshi = "A3横"
+				judge = "OK"
+			}
+
+			out2 += "\n" + strf("%4d",pagecount + 1) + "\t" + strf("%6.1f",xpagesize(pagecount)) + "\t" + strf("%6.1f",ypagesize(pagecount)) + "\t  " + youshi + "\t  " + judge
+
+			pagecount++
+
+		}
+
+		ichi += movesiz
+		await 0
+	loop
+
+	if pagecount <= 0{
+		out2 = "PDFを解析できませんでした"
+		objenable 2,1
+	}else{
+		objenable 2,1
+	}
+	
+	objprm 0,out2
+
+	stop
+
+
+*file_select
+
+	dialog "pdf",16,"PDFファイル"
+	if stat != 1{
+		objenable 2,1
+		stop
+	}
+	fn = refstr
+
+	goto *analyze_start
+
+
+*settings
+
+	screen 2,640,160,4
+	gsel 0,-1
+	gsel 2,0
+
+	title "設定 - PDFスケーリング自動化ツール"
+
+	in_cpdfpath = cpdfpath
+	in_temppath = tempdir
+
+	pos 10,10
+	mes "CPDFのパス"
+	input in_cpdfpath,500,20
+	pos 530,25
+	button "参照",*cpdfpath_select
+	pos 10,70
+	mes "作業用フォルダのパス"
+	input in_temppath,500,20
+	pos 530,85
+	button "参照",*temppath_select
+
+	pos 500,130
+	button "OK",*settingok
+	pos 570,130
+	button "キャンセル",*settingcancel
+	stop
+
+*settingok
+	cpdfpath = in_cpdfpath
+	tempdir = in_temppath
+	inidata = "cpdfpath\t" + cpdfpath + "\ntempdir\t" + tempdir + "\nthreshould\t0.5"
+	delete "" + cdir + "\\pdf_scaling.ini"
+	bsave "" + cdir + "\\pdf_scaling.ini",inidata,strlen(inidata)
+
+*settingcancel
+
+	gsel 2,-1
+	gsel 0,1
+	stop
+
+*cpdfpath_select
+	dialog "exe",16,"実行ファイル(CPDF)"
+	if stat == 1 :in_cpdfpath = refstr
+	objprm 0,in_cpdfpath
+	stop
+
+*temppath_select
+	selfolder in2_temppath,"作業用フォルダを選択してください"
+	if stat == 0 :in_temppath = in2_temppath
+	objprm 2,in_temppath
+	stop

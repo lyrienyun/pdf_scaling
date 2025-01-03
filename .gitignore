@@ -1,0 +1,6 @@
+*.ini
+temp/
+hsptmp
+obj
+start.ax
+packfile
