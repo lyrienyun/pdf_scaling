@@ -4,13 +4,13 @@
 #include "hspext.as"
 #include "mod_existdir.hsp"
 
-#define SOFT_VER "0.10.2025.0103"
+#define SOFT_VER "0.10.2025.0104"
 
 	screen 0,500,500
 
 	sdim pipeout,2097152
 	sdim out,2097152
-	sdim out2,65536
+	sdim out2,2097152
 	ddim xpagesize,10000
 	ddim ypagesize,10000
 	dim rotateflag,10000
