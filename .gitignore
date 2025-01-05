@@ -4,5 +4,5 @@ hsptmp
 obj
 start.ax
 packfile
-hsptmp.exe
+*.exe
 *.zip
