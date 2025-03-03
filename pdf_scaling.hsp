@@ -4,7 +4,7 @@
 #include "hspext.as"
 #include "mod_existdir.hsp"
 
-#define SOFT_VER "0.10.2025.0104"
+#define SOFT_VER "0.11.2025.0303"
 
 	screen 0,500,500
 
@@ -206,11 +206,13 @@
 
 			if xpagesize(pagecount) > ypagesize(pagecount){
 				longsize = xpagesize(pagecount)
+				shortsize = ypagesize(pagecount)
 			}else{
 				longsize = ypagesize(pagecount)
+				shortsize = xpagesize(pagecount)
 			}
 
-			if longsize > 300.0 {
+			if shortsize > 220.0 {
 				scalesize(pagecount) = 3
 				yoteisize = "A3‰¡"
 
