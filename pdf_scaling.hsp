@@ -402,15 +402,6 @@
 		stop
 	}
 
-	chdir tempdir
-	dirlist flist,"*.*",1
-	repeat stat
-		dirlist flist,"*.*",1
-		if strlen(flist) < 1 : break
-		getstr delfn,flist,0
-		if delfn != "out.pdf" : delete "" + tempdir + "\\" + delfn
-	loop
-
 	out2 = "ファイル結合が完了しました\n" + out2
 	objprm 0,out2
 
@@ -418,8 +409,18 @@
 	if strsize > -1 : delete savefn
 	
 	bcopy "" + tempdir + "\\out.pdf",savefn
-	delete "" + tempdir + "\\out.pdf"
+
+	chdir tempdir
+	dirlist flist,"*.*",1
+	repeat stat
+		dirlist flist,"*.*",1
+		if strlen(flist) < 1 : break
+		getstr delfn,flist,0
+		delete "" + tempdir + "\\" + delfn
+	loop
+
 	fn = savefn
+	chdir getpath(fn,32)
 
 //再度解析
 
