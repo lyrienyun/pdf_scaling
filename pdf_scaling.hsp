@@ -1,10 +1,11 @@
 // PDF自動スケーリングツール
-//
+//  
 
 #include "hspext.as"
 #include "mod_existdir.hsp"
+#include "mod_savedialogex.hsp"
 
-#define SOFT_VER "0.11.2025.0303"
+#define SOFT_VER "0.12.2025.0422"
 
 	screen 0,500,500
 
@@ -42,6 +43,8 @@
 	sdim in_cpdfpath,1024
 	sdim in_temppath,1024
 	sdim in2_temppath,1024
+
+	sdim savefn,1024
 
 	pos 5,5
 	font msgothic,14,17
@@ -271,6 +274,21 @@
 		stop
 	}
 
+	savedialogex "PDFファイル(*.pdf)|*.pdf",getpath(fn,8),"PDFファイルの保存先を指定してください",getpath(fn,32)
+
+	if stat == 0{
+		objenable 1,1
+		objenable 2,1
+		stop
+	}else{
+		savefn = refstr
+		if ((strmid(savefn,-1,4) != ".pdf") && (strmid(savefn,-1,4) != ".PDF")){
+			savefn += ".pdf"
+		}
+	}
+
+
+
 	out2 = "スケーリング処理を開始します...\n\n" + out2
 	objprm 0,out2
 
@@ -368,7 +386,7 @@
 	loop
 
 	pipeout = ""
-	pipeexec pipeout,"" + cpdfpath + " -merge -idir \"" + tempdir + "\" -o \"" + getpath(fn,1) + "_out.pdf\""
+	pipeexec pipeout,"" + cpdfpath + " -merge -idir \"" + tempdir + "\" -o \"" + tempdir + "\\out.pdf\""
 
 	repeat
 		pipeget ln
@@ -390,15 +408,18 @@
 		dirlist flist,"*.*",1
 		if strlen(flist) < 1 : break
 		getstr delfn,flist,0
-		delete "" + tempdir + "\\" + delfn
+		if delfn != "out.pdf" : delete "" + tempdir + "\\" + delfn
 	loop
 
 	out2 = "ファイル結合が完了しました\n" + out2
 	objprm 0,out2
 
-	delete fn
-	bcopy "" + getpath(fn,1) + "_out.pdf",fn
-	delete "" + getpath(fn,1) + "_out.pdf"
+	exist savefn
+	if strsize > -1 : delete savefn
+	
+	bcopy "" + tempdir + "\\out.pdf",savefn
+	delete "" + tempdir + "\\out.pdf"
+	fn = savefn
 
 //再度解析
 
