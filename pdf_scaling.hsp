@@ -5,7 +5,7 @@
 #include "mod_existdir.hsp"
 #include "mod_savedialogex.hsp"
 
-#define SOFT_VER "0.12.2025.0422"
+#define SOFT_VER "0.13.2025.0501"
 
 	screen 0,500,500
 
@@ -99,13 +99,40 @@
 		bsave "pdf_scaling.ini",inidata,strlen(inidata)
 	}
 
-	if dir_cmdline == ""{
-		dialog "pdf",16,"PDFファイル"
-		if stat != 1{
-			objenable 2,1
+	exist cpdfpath
+	if strsize < 1{
+		cpdfpath = cdir + "\\cpdf.exe"
+		exist cpdfpath
+		if strsize < 1{
+			out2 = "Error:バックエンドツール'CPDF'が見つかりませんでした\n      設定画面から適切なパスを指定してください"
+			objprm 0,out2
+			objenable 1,0
+			objenable 2,0
 			stop
+		}else{
+			inidata = "cpdfpath\t" + cpdfpath + "\ntempdir\t" + tempdir + "\nthreshould\t0.5"
+			bsave "pdf_scaling.ini",inidata,strlen(inidata)
 		}
-		fn = refstr
+	}
+
+	//作業用フォルダがない場合の処理
+	if exist_dir(tempdir){
+
+		if exist_dir(cdir + "\\temp"){
+			chdir cdir
+			mkdir "temp"
+		}
+
+		tempdir = cdir + "\\temp"
+
+		inidata = "cpdfpath\t" + cpdfpath + "\ntempdir\t" + tempdir + "\nthreshould\t0.5"
+		bsave "pdf_scaling.ini",inidata,strlen(inidata)
+
+	}
+
+	if dir_cmdline == ""{
+		objenable 2,1
+		stop
 	}else{
 		fn = dir_cmdline
 		if peek(fn,0) == '"' : getstr fn,fn,1,'"'
@@ -273,6 +300,8 @@
 		objenable 2,1
 		stop
 	}
+
+	chdir getpath(fn,32)
 
 	savedialogex "PDFファイル(*.pdf)|*.pdf",getpath(fn,8),"PDFファイルの保存先を指定してください",getpath(fn,32)
 
@@ -613,6 +642,18 @@
 	stop
 
 *settingok
+
+	exist in_cpdfpath
+	if strsize < 1{
+		dialog "指定されたパスにCPDFが存在しません",1,"Error"
+		stop
+	}
+
+	if exist_dir(in_temppath){
+		dialog "作業用フォルダが存在しません",1,"Error"
+		stop
+	}
+
 	cpdfpath = in_cpdfpath
 	tempdir = in_temppath
 	inidata = "cpdfpath\t" + cpdfpath + "\ntempdir\t" + tempdir + "\nthreshould\t0.5"
